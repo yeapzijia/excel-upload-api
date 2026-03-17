@@ -1,6 +1,6 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from datetime import datetime
 import pandas as pd
 import io
@@ -17,6 +17,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ✅ NEW: Root health check (fixes K2 first probe returning 0)
+@app.get("/")
+async def health_check():
+    return {"status": "ok"}
+
+# ✅ NEW: Log incoming headers for debugging (remove after fixing 403)
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f">>> {request.method} {request.url}")
+    print(f">>> Headers: {dict(request.headers)}")
+    response = await call_next(request)
+    print(f">>> Response status: {response.status_code}")
+    return response
+
 @app.get("/todos/{id}")
 async def get_todo(id: int):
     return {
@@ -30,14 +44,17 @@ async def get_todo(id: int):
 async def upload_excel(file: UploadFile = File(...)):
     # Check file type
     if not file.filename.endswith(('.xlsx', '.xls')):
-        return {
-            "status": "error",
-            "message": "Only .xlsx or .xls files are allowed"
-        }
-    
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Only .xlsx or .xls files are allowed"
+            }
+        )
+
     # Read file content
     contents = await file.read()
-    
+
     # Parse Excel into DataFrame
     df = pd.read_excel(io.BytesIO(contents))
     excel_file = pd.ExcelFile(io.BytesIO(contents))
@@ -62,7 +79,7 @@ async def upload_excel(file: UploadFile = File(...)):
         "data": data,
         "downloadUrl": f"/excel/download/{os.path.basename(temp_file.name)}"
     }
-    
+
     return response
 
 # Endpoint to download exact original file
@@ -70,7 +87,10 @@ async def upload_excel(file: UploadFile = File(...)):
 async def download_excel(temp_filename: str):
     temp_path = os.path.join(tempfile.gettempdir(), temp_filename)
     if not os.path.exists(temp_path):
-        return {"status": "error", "message": "File not found"}
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "message": "File not found"}
+        )
     return FileResponse(
         path=temp_path,
         filename=temp_filename,
