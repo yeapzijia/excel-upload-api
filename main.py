@@ -1,13 +1,11 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
 from datetime import datetime
 import pandas as pd
 import io
 import tempfile
 import os
-import base64
 
 app = FastAPI()
 
@@ -24,7 +22,7 @@ app.add_middleware(
 async def health_check():
     return {"status": "ok"}
 
-# Swagger 2.0 descriptor for K2 compatibility
+# ✅ NEW: Swagger 2.0 descriptor for K2 compatibility
 @app.get("/swagger.json")
 async def swagger_json():
     return {
@@ -74,8 +72,8 @@ async def swagger_json():
                             "name": "id",
                             "in": "path",
                             "required": True,
-                            "type": "integer",    # ← back to original
-                            "format": "int32"     # ← back to original
+                            "type": "integer",
+                            "format": "int32"
                         }
                     ],
                     "responses": {
@@ -98,7 +96,7 @@ async def swagger_json():
                             "name": "file",
                             "in": "formData",
                             "required": True,
-                            "type": "file"        # ← back to original
+                            "type": "file"
                         }
                     ],
                     "responses": {
@@ -142,9 +140,8 @@ async def log_requests(request: Request, call_next):
     print(f">>> Response status: {response.status_code}")
     return response
 
-# Todo endpoint
-@app.get("/todos")
-async def get_todo(id: str):
+@app.get("/todos/{id}")
+async def get_todo(id: int):
     return {
         "userId": 1,
         "id": id,
@@ -152,61 +149,38 @@ async def get_todo(id: str):
         "completed": False
     }
 
-# Upload request model
-class UploadRequest(BaseModel):
-    fileName: str
-    fileContent: str  # base64 encoded file
-
-# Excel upload endpoint
 @app.post("/excel/upload")
-async def upload_excel(request: UploadRequest):
-    try:
-        # Validate file extension
-        if not request.fileName.endswith(('.xlsx', '.xls')):
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "status": "error",
-                    "message": "Only .xlsx or .xls files are allowed"
-                }
-            )
-
-        # Decode base64 to bytes
-        contents = base64.b64decode(request.fileContent)
-
-        # Parse Excel
-        df = pd.read_excel(io.BytesIO(contents))
-        excel_file = pd.ExcelFile(io.BytesIO(contents))
-        sheet_name = excel_file.sheet_names[0]
-        data = df.to_dict(orient="records")
-
-        # Save temp file
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-        temp_file.write(contents)
-        temp_file.close()
-
-        return {
-            "status": "success",
-            "message": "File uploaded successfully",
-            "fileName": request.fileName,
-            "fileSize": len(contents),
-            "uploadedAt": datetime.now().isoformat(),
-            "sheetName": sheet_name,
-            "rowsProcessed": len(df),
-            "errorDetails": "",
-            "downloadUrl": f"https://affectionate-light-production.up.railway.app/excel/download/{os.path.basename(temp_file.name)}"
-        }
-
-    except Exception as e:
+async def upload_excel(file: UploadFile = File(...)):
+    if not file.filename.endswith(('.xlsx', '.xls')):
         return JSONResponse(
-            status_code=500,
+            status_code=400,
             content={
                 "status": "error",
-                "message": str(e)
+                "message": "Only .xlsx or .xls files are allowed"
             }
         )
+    contents = await file.read()
+    df = pd.read_excel(io.BytesIO(contents))
+    excel_file = pd.ExcelFile(io.BytesIO(contents))
+    sheet_name = excel_file.sheet_names[0]
+    data = df.to_dict(orient="records")
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    temp_file.write(contents)
+    temp_file.close()
+    response = {
+        "status": "success",
+        "message": "File uploaded successfully",
+        "fileName": file.filename,
+        "fileSize": len(contents),
+        "uploadedAt": datetime.now().isoformat(),
+        "sheetName": sheet_name,
+        "rowsProcessed": len(df),
+        "errorDetails": "",
+        "data": data,
+        "downloadUrl": f"/excel/download/{os.path.basename(temp_file.name)}"
+    }
+    return response
 
-# Excel download endpoint
 @app.get("/excel/download/{temp_filename}")
 async def download_excel(temp_filename: str):
     temp_path = os.path.join(tempfile.gettempdir(), temp_filename)
