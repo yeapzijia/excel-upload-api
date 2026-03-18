@@ -22,7 +22,7 @@ app.add_middleware(
 async def health_check():
     return {"status": "ok"}
 
-# ✅ NEW: Swagger 2.0 descriptor for K2 compatibility
+# Swagger 2.0 descriptor for K2 compatibility
 @app.get("/swagger.json")
 async def swagger_json():
     return {
@@ -56,7 +56,7 @@ async def swagger_json():
                 "type": "object",
                 "properties": {
                     "userId":    {"type": "integer"},
-                    "id":        {"type": "integer"},
+                    "id":        {"type": "string"},
                     "title":     {"type": "string"},
                     "completed": {"type": "boolean"}
                 }
@@ -72,8 +72,7 @@ async def swagger_json():
                             "name": "id",
                             "in": "path",
                             "required": True,
-                            "type": "integer",
-                            "format": "int32"
+                            "type": "string"
                         }
                     ],
                     "responses": {
@@ -96,7 +95,8 @@ async def swagger_json():
                             "name": "file",
                             "in": "formData",
                             "required": True,
-                            "type": "file"
+                            "type": "string",
+                            "format": "binary"
                         }
                     ],
                     "responses": {
@@ -141,7 +141,7 @@ async def log_requests(request: Request, call_next):
     return response
 
 @app.get("/todos/{id}")
-async def get_todo(id: int):
+async def get_todo(id: str):        # ← changed to str
     return {
         "userId": 1,
         "id": id,
@@ -177,7 +177,7 @@ async def upload_excel(file: UploadFile = File(...)):
         "rowsProcessed": len(df),
         "errorDetails": "",
         "data": data,
-        "downloadUrl": f"/excel/download/{os.path.basename(temp_file.name)}"
+        "downloadUrl": f"https://affectionate-light-production.up.railway.app/excel/download/{os.path.basename(temp_file.name)}"
     }
     return response
 
