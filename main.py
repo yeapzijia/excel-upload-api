@@ -32,7 +32,7 @@ async def swagger_json():
             "description": "A test API for K2",
             "version": "1.0.0"
         },
-        "host": "excel-upload-api-nqsd.onrender.com",
+        "host": "affectionate-light-production.up.railway.app",
         "basePath": "/",
         "schemes": ["https"],
         "consumes": ["application/json"],
