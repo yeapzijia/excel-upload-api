@@ -9,7 +9,7 @@ import os
 
 app = FastAPI()
 
-# Allow all origins for K2 Designer
+# Allow K2 Designer or any origin to call
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,7 +23,7 @@ async def health_check():
     return {"status": "ok"}
 
 
-# Swagger JSON for K2
+# K2-compatible Swagger JSON
 @app.get("/swagger.json")
 async def swagger_json():
     return {
@@ -39,42 +39,13 @@ async def swagger_json():
         "consumes": ["application/json"],
         "produces": ["application/json"],
 
-        # Definitions (for reference, optional)
-        "definitions": {
-            "Todo": {
-                "type": "object",
-                "properties": {
-                    "userId": {"type": "integer"},
-                    "id": {"type": "integer"},
-                    "title": {"type": "string"},
-                    "completed": {"type": "boolean"}
-                }
-            },
-            "UploadResponse": {
-                "type": "object",
-                "properties": {
-                    "status": {"type": "string"},
-                    "message": {"type": "string"},
-                    "fileName": {"type": "string"},
-                    "fileSize": {"type": "integer"},
-                    "uploadedAt": {"type": "string"},
-                    "sheetName": {"type": "string"},
-                    "rowsProcessed": {"type": "integer"},
-                    "errorDetails": {"type": "string"},
-                    "downloadUrl": {"type": "string"}
-                }
-            }
-        },
-
         "paths": {
-            # GET Todo - inline schema so K2 shows response
             "/todos/{id}": {
                 "get": {
                     "operationId": "getTodoById",
                     "summary": "Get a single todo item",
-                    "produces": ["application/json"],
                     "parameters": [
-                        {"name": "id", "in": "path", "required": True, "type": "integer", "format": "int32"}
+                        {"name": "id", "in": "path", "required": True, "type": "integer"}
                     ],
                     "responses": {
                         "200": {
@@ -93,12 +64,10 @@ async def swagger_json():
                 }
             },
 
-            # POST Upload Excel - K2 may not show all properties due to file, but API works
             "/excel/upload": {
                 "post": {
                     "operationId": "uploadExcel",
                     "summary": "Upload an Excel file",
-                    "produces": ["application/json"],
                     "consumes": ["multipart/form-data"],
                     "parameters": [
                         {"name": "file", "in": "formData", "required": True, "type": "file"}
@@ -106,16 +75,25 @@ async def swagger_json():
                     "responses": {
                         "200": {
                             "description": "OK",
+                            # Only simple fields for K2 Designer
                             "schema": {
                                 "type": "object",
-                                "$ref": "#/definitions/UploadResponse"
+                                "properties": {
+                                    "status": {"type": "string"},
+                                    "message": {"type": "string"},
+                                    "fileName": {"type": "string"},
+                                    "fileSize": {"type": "integer"},
+                                    "uploadedAt": {"type": "string"},
+                                    "sheetName": {"type": "string"},
+                                    "rowsProcessed": {"type": "integer"},
+                                    "downloadUrl": {"type": "string"}
+                                }
                             }
                         }
                     }
                 }
             },
 
-            # GET Download Excel
             "/excel/download/{temp_filename}": {
                 "get": {
                     "operationId": "downloadExcel",
@@ -123,9 +101,7 @@ async def swagger_json():
                     "parameters": [
                         {"name": "temp_filename", "in": "path", "required": True, "type": "string"}
                     ],
-                    "responses": {
-                        "200": {"description": "File download"}
-                    }
+                    "responses": {"200": {"description": "File download"}}
                 }
             }
         }
@@ -135,9 +111,7 @@ async def swagger_json():
 # Debug middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    print(f">>> {request.method} {request.url}")
     response = await call_next(request)
-    print(f">>> Response status: {response.status_code}")
     return response
 
 
@@ -158,6 +132,8 @@ async def upload_excel(file: UploadFile = File(...)):
     excel_file = pd.ExcelFile(io.BytesIO(contents))
     sheet_name = excel_file.sheet_names[0]
 
+    data = df.to_dict(orient="records")  # still returned at runtime
+
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     temp_file.write(contents)
     temp_file.close()
@@ -171,6 +147,7 @@ async def upload_excel(file: UploadFile = File(...)):
         "sheetName": sheet_name,
         "rowsProcessed": len(df),
         "errorDetails": "",
+        "data": data,  # full data still returned at runtime
         "downloadUrl": f"/excel/download/{os.path.basename(temp_file.name)}"
     }
 
