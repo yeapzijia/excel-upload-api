@@ -9,7 +9,7 @@ import os
 
 app = FastAPI()
 
-# Allow all origins (for K2)
+# Allow all origins for K2 Designer
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,7 +22,8 @@ app.add_middleware(
 async def health_check():
     return {"status": "ok"}
 
-# ✅ K2-compatible Swagger 2.0
+
+# Swagger JSON for K2
 @app.get("/swagger.json")
 async def swagger_json():
     return {
@@ -38,7 +39,7 @@ async def swagger_json():
         "consumes": ["application/json"],
         "produces": ["application/json"],
 
-        # ✅ DEFINITIONS (IMPORTANT)
+        # Definitions (for reference, optional)
         "definitions": {
             "Todo": {
                 "type": "object",
@@ -66,35 +67,33 @@ async def swagger_json():
         },
 
         "paths": {
-
-            # ✅ GET TODO
+            # GET Todo - inline schema so K2 shows response
             "/todos/{id}": {
                 "get": {
                     "operationId": "getTodoById",
                     "summary": "Get a single todo item",
                     "produces": ["application/json"],
                     "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": True,
-                            "type": "integer",
-                            "format": "int32"
-                        }
+                        {"name": "id", "in": "path", "required": True, "type": "integer", "format": "int32"}
                     ],
                     "responses": {
                         "200": {
                             "description": "OK",
                             "schema": {
                                 "type": "object",
-                                "$ref": "#/definitions/Todo"
+                                "properties": {
+                                    "userId": {"type": "integer"},
+                                    "id": {"type": "integer"},
+                                    "title": {"type": "string"},
+                                    "completed": {"type": "boolean"}
+                                }
                             }
                         }
                     }
                 }
             },
 
-            # ✅ UPLOAD EXCEL
+            # POST Upload Excel - K2 may not show all properties due to file, but API works
             "/excel/upload": {
                 "post": {
                     "operationId": "uploadExcel",
@@ -102,12 +101,7 @@ async def swagger_json():
                     "produces": ["application/json"],
                     "consumes": ["multipart/form-data"],
                     "parameters": [
-                        {
-                            "name": "file",
-                            "in": "formData",
-                            "required": True,
-                            "type": "file"
-                        }
+                        {"name": "file", "in": "formData", "required": True, "type": "file"}
                     ],
                     "responses": {
                         "200": {
@@ -121,28 +115,22 @@ async def swagger_json():
                 }
             },
 
-            # ✅ DOWNLOAD (no return body)
+            # GET Download Excel
             "/excel/download/{temp_filename}": {
                 "get": {
                     "operationId": "downloadExcel",
                     "summary": "Download uploaded Excel file",
                     "parameters": [
-                        {
-                            "name": "temp_filename",
-                            "in": "path",
-                            "required": True,
-                            "type": "string"
-                        }
+                        {"name": "temp_filename", "in": "path", "required": True, "type": "string"}
                     ],
                     "responses": {
-                        "200": {
-                            "description": "File download"
-                        }
+                        "200": {"description": "File download"}
                     }
                 }
             }
         }
     }
+
 
 # Debug middleware
 @app.middleware("http")
@@ -152,27 +140,18 @@ async def log_requests(request: Request, call_next):
     print(f">>> Response status: {response.status_code}")
     return response
 
+
 # GET Todo API
 @app.get("/todos/{id}")
 async def get_todo(id: int):
-    return {
-        "userId": 1,
-        "id": id,
-        "title": "Sample Todo",
-        "completed": False
-    }
+    return {"userId": 1, "id": id, "title": "Sample Todo", "completed": False}
+
 
 # Upload Excel API
 @app.post("/excel/upload")
 async def upload_excel(file: UploadFile = File(...)):
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error",
-                "message": "Only .xlsx or .xls files are allowed"
-            }
-        )
+    if not file.filename.endswith((".xlsx", ".xls")):
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Only .xlsx or .xls files are allowed"})
 
     contents = await file.read()
     df = pd.read_excel(io.BytesIO(contents))
@@ -195,22 +174,16 @@ async def upload_excel(file: UploadFile = File(...)):
         "downloadUrl": f"/excel/download/{os.path.basename(temp_file.name)}"
     }
 
+
 # Download Excel API
 @app.get("/excel/download/{temp_filename}")
 async def download_excel(temp_filename: str):
     temp_path = os.path.join(tempfile.gettempdir(), temp_filename)
-
     if not os.path.exists(temp_path):
-        return JSONResponse(
-            status_code=404,
-            content={
-                "status": "error",
-                "message": "File not found"
-            }
-        )
+        return JSONResponse(status_code=404, content={"status": "error", "message": "File not found"})
 
     return FileResponse(
         path=temp_path,
         filename=temp_filename,
-        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
