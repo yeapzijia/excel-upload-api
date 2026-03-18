@@ -40,13 +40,6 @@ async def swagger_json():
         "consumes": ["application/json"],
         "produces": ["application/json"],
         "definitions": {
-            "UploadRequest": {
-                "type": "object",
-                "properties": {
-                    "fileName":    {"type": "string"},
-                    "fileContent": {"type": "string"}
-                }
-            },
             "UploadResponse": {
                 "type": "object",
                 "properties": {
@@ -65,23 +58,24 @@ async def swagger_json():
                 "type": "object",
                 "properties": {
                     "userId":    {"type": "integer"},
-                    "id":        {"type": "string"},
+                    "id":        {"type": "integer"},
                     "title":     {"type": "string"},
                     "completed": {"type": "boolean"}
                 }
             }
         },
         "paths": {
-            "/todos": {
+            "/todos/{id}": {
                 "get": {
                     "operationId": "getTodoById",
                     "summary": "Get a single todo item",
                     "parameters": [
                         {
                             "name": "id",
-                            "in": "query",
+                            "in": "path",
                             "required": True,
-                            "type": "string"
+                            "type": "integer",    # ← back to original
+                            "format": "int32"     # ← back to original
                         }
                     ],
                     "responses": {
@@ -98,15 +92,13 @@ async def swagger_json():
                 "post": {
                     "operationId": "uploadExcel",
                     "summary": "Upload an Excel file",
-                    "consumes": ["application/json"],
+                    "consumes": ["multipart/form-data"],
                     "parameters": [
                         {
-                            "name": "body",
-                            "in": "body",
+                            "name": "file",
+                            "in": "formData",
                             "required": True,
-                            "schema": {
-                                "$ref": "#/definitions/UploadRequest"
-                            }
+                            "type": "file"        # ← back to original
                         }
                     ],
                     "responses": {
