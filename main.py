@@ -37,6 +37,31 @@ async def swagger_json():
         "schemes": ["https"],
         "consumes": ["application/json"],
         "produces": ["application/json"],
+        "definitions": {
+            "UploadResponse": {
+                "type": "object",
+                "properties": {
+                    "status":        {"type": "string"},
+                    "message":       {"type": "string"},
+                    "fileName":      {"type": "string"},
+                    "fileSize":      {"type": "integer"},
+                    "uploadedAt":    {"type": "string"},
+                    "sheetName":     {"type": "string"},
+                    "rowsProcessed": {"type": "integer"},
+                    "errorDetails":  {"type": "string"},
+                    "downloadUrl":   {"type": "string"}
+                }
+            },
+            "TodoResponse": {
+                "type": "object",
+                "properties": {
+                    "userId":    {"type": "integer"},
+                    "id":        {"type": "integer"},
+                    "title":     {"type": "string"},
+                    "completed": {"type": "boolean"}
+                }
+            }
+        },
         "paths": {
             "/todos/{id}": {
                 "get": {
@@ -55,13 +80,7 @@ async def swagger_json():
                         "200": {
                             "description": "OK",
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "userId":    {"type": "integer"},
-                                    "id":        {"type": "integer"},
-                                    "title":     {"type": "string"},
-                                    "completed": {"type": "boolean"}
-                                }
+                                "$ref": "#/definitions/TodoResponse"
                             }
                         }
                     }
@@ -84,18 +103,7 @@ async def swagger_json():
                         "200": {
                             "description": "OK",
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "status":        {"type": "string"},
-                                    "message":       {"type": "string"},
-                                    "fileName":      {"type": "string"},
-                                    "fileSize":      {"type": "integer"},
-                                    "uploadedAt":    {"type": "string"},
-                                    "sheetName":     {"type": "string"},
-                                    "rowsProcessed": {"type": "integer"},
-                                    "errorDetails":  {"type": "string"},
-                                    "downloadUrl":   {"type": "string"}
-                                }
+                                "$ref": "#/definitions/UploadResponse"
                             }
                         }
                     }
