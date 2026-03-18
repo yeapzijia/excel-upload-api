@@ -9,7 +9,7 @@ import os
 
 app = FastAPI()
 
-# Allow all origins (for K2 Designer)
+# Allow all origins (for K2)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,7 +38,7 @@ async def swagger_json():
         "consumes": ["application/json"],
         "produces": ["application/json"],
 
-        # ✅ IMPORTANT: definitions (K2 needs this)
+        # ✅ DEFINITIONS (IMPORTANT)
         "definitions": {
             "Todo": {
                 "type": "object",
@@ -66,10 +66,13 @@ async def swagger_json():
         },
 
         "paths": {
+
+            # ✅ GET TODO
             "/todos/{id}": {
                 "get": {
                     "operationId": "getTodoById",
                     "summary": "Get a single todo item",
+                    "produces": ["application/json"],
                     "parameters": [
                         {
                             "name": "id",
@@ -83,6 +86,7 @@ async def swagger_json():
                         "200": {
                             "description": "OK",
                             "schema": {
+                                "type": "object",
                                 "$ref": "#/definitions/Todo"
                             }
                         }
@@ -90,10 +94,12 @@ async def swagger_json():
                 }
             },
 
+            # ✅ UPLOAD EXCEL
             "/excel/upload": {
                 "post": {
                     "operationId": "uploadExcel",
                     "summary": "Upload an Excel file",
+                    "produces": ["application/json"],
                     "consumes": ["multipart/form-data"],
                     "parameters": [
                         {
@@ -107,6 +113,7 @@ async def swagger_json():
                         "200": {
                             "description": "OK",
                             "schema": {
+                                "type": "object",
                                 "$ref": "#/definitions/UploadResponse"
                             }
                         }
@@ -114,6 +121,7 @@ async def swagger_json():
                 }
             },
 
+            # ✅ DOWNLOAD (no return body)
             "/excel/download/{temp_filename}": {
                 "get": {
                     "operationId": "downloadExcel",
@@ -128,7 +136,7 @@ async def swagger_json():
                     ],
                     "responses": {
                         "200": {
-                            "description": "File download (no JSON response)"
+                            "description": "File download"
                         }
                     }
                 }
@@ -144,7 +152,7 @@ async def log_requests(request: Request, call_next):
     print(f">>> Response status: {response.status_code}")
     return response
 
-# GET Todo
+# GET Todo API
 @app.get("/todos/{id}")
 async def get_todo(id: int):
     return {
@@ -154,7 +162,7 @@ async def get_todo(id: int):
         "completed": False
     }
 
-# Upload Excel
+# Upload Excel API
 @app.post("/excel/upload")
 async def upload_excel(file: UploadFile = File(...)):
     if not file.filename.endswith(('.xlsx', '.xls')):
@@ -187,7 +195,7 @@ async def upload_excel(file: UploadFile = File(...)):
         "downloadUrl": f"/excel/download/{os.path.basename(temp_file.name)}"
     }
 
-# Download Excel
+# Download Excel API
 @app.get("/excel/download/{temp_filename}")
 async def download_excel(temp_filename: str):
     temp_path = os.path.join(tempfile.gettempdir(), temp_filename)
