@@ -37,34 +37,6 @@ async def swagger_json():
         "schemes": ["https"],
         "consumes": ["application/json"],
         "produces": ["application/json"],
-
-        # ← ONLY ADD THIS BLOCK
-        "definitions": {
-            "UploadResponse": {
-                "type": "object",
-                "properties": {
-                    "status":        {"type": "string"},
-                    "message":       {"type": "string"},
-                    "fileName":      {"type": "string"},
-                    "fileSize":      {"type": "integer"},
-                    "uploadedAt":    {"type": "string"},
-                    "sheetName":     {"type": "string"},
-                    "rowsProcessed": {"type": "integer"},
-                    "errorDetails":  {"type": "string"},
-                    "downloadUrl":   {"type": "string"}
-                }
-            },
-            "TodoResponse": {
-                "type": "object",
-                "properties": {
-                    "userId":    {"type": "integer"},
-                    "id":        {"type": "integer"},
-                    "title":     {"type": "string"},
-                    "completed": {"type": "boolean"}
-                }
-            }
-        },
-
         "paths": {
             "/todos/{id}": {
                 "get": {
@@ -83,7 +55,13 @@ async def swagger_json():
                         "200": {
                             "description": "OK",
                             "schema": {
-                                "$ref": "#/definitions/TodoResponse"  # ← CHANGE THIS ONLY
+                                "type": "object",
+                                "properties": {
+                                    "userId":    {"type": "integer"},
+                                    "id":        {"type": "integer"},
+                                    "title":     {"type": "string"},
+                                    "completed": {"type": "boolean"}
+                                }
                             }
                         }
                     }
@@ -99,14 +77,25 @@ async def swagger_json():
                             "name": "file",
                             "in": "formData",
                             "required": True,
-                            "type": "file"      # ← KEEP SAME
+                            "type": "file"
                         }
                     ],
                     "responses": {
                         "200": {
                             "description": "OK",
                             "schema": {
-                                "$ref": "#/definitions/UploadResponse"  # ← CHANGE THIS ONLY
+                                "type": "object",
+                                "properties": {
+                                    "status":        {"type": "string"},
+                                    "message":       {"type": "string"},
+                                    "fileName":      {"type": "string"},
+                                    "fileSize":      {"type": "integer"},
+                                    "uploadedAt":    {"type": "string"},
+                                    "sheetName":     {"type": "string"},
+                                    "rowsProcessed": {"type": "integer"},
+                                    "errorDetails":  {"type": "string"},
+                                    "downloadUrl":   {"type": "string"}
+                                }
                             }
                         }
                     }
@@ -121,12 +110,12 @@ async def swagger_json():
                             "name": "temp_filename",
                             "in": "path",
                             "required": True,
-                            "type": "string"    # ← KEEP SAME
+                            "type": "string"
                         }
                     ],
                     "responses": {
                         "200": {
-                            "description": "OK"  # ← KEEP SAME
+                            "description": "OK"
                         }
                     }
                 }
@@ -197,3 +186,4 @@ async def download_excel(temp_filename: str):
         filename=temp_filename,
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
+
