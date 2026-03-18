@@ -9,7 +9,7 @@ import os
 
 app = FastAPI()
 
-# Allow K2 Designer or any origin to call
+# Allow all origins (for K2 Designer)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,12 +17,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Root health check
+# Health check
 @app.get("/")
 async def health_check():
     return {"status": "ok"}
 
-# ✅ NEW: Swagger 2.0 descriptor for K2 compatibility
+# ✅ K2-compatible Swagger 2.0
 @app.get("/swagger.json")
 async def swagger_json():
     return {
@@ -37,6 +37,34 @@ async def swagger_json():
         "schemes": ["https"],
         "consumes": ["application/json"],
         "produces": ["application/json"],
+
+        # ✅ IMPORTANT: definitions (K2 needs this)
+        "definitions": {
+            "Todo": {
+                "type": "object",
+                "properties": {
+                    "userId": {"type": "integer"},
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "completed": {"type": "boolean"}
+                }
+            },
+            "UploadResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string"},
+                    "message": {"type": "string"},
+                    "fileName": {"type": "string"},
+                    "fileSize": {"type": "integer"},
+                    "uploadedAt": {"type": "string"},
+                    "sheetName": {"type": "string"},
+                    "rowsProcessed": {"type": "integer"},
+                    "errorDetails": {"type": "string"},
+                    "downloadUrl": {"type": "string"}
+                }
+            }
+        },
+
         "paths": {
             "/todos/{id}": {
                 "get": {
@@ -55,18 +83,13 @@ async def swagger_json():
                         "200": {
                             "description": "OK",
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "userId":    {"type": "integer"},
-                                    "id":        {"type": "integer"},
-                                    "title":     {"type": "string"},
-                                    "completed": {"type": "boolean"}
-                                }
+                                "$ref": "#/definitions/Todo"
                             }
                         }
                     }
                 }
             },
+
             "/excel/upload": {
                 "post": {
                     "operationId": "uploadExcel",
@@ -84,23 +107,13 @@ async def swagger_json():
                         "200": {
                             "description": "OK",
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "status":        {"type": "string"},
-                                    "message":       {"type": "string"},
-                                    "fileName":      {"type": "string"},
-                                    "fileSize":      {"type": "integer"},
-                                    "uploadedAt":    {"type": "string"},
-                                    "sheetName":     {"type": "string"},
-                                    "rowsProcessed": {"type": "integer"},
-                                    "errorDetails":  {"type": "string"},
-                                    "downloadUrl":   {"type": "string"}
-                                }
+                                "$ref": "#/definitions/UploadResponse"
                             }
                         }
                     }
                 }
             },
+
             "/excel/download/{temp_filename}": {
                 "get": {
                     "operationId": "downloadExcel",
@@ -115,7 +128,7 @@ async def swagger_json():
                     ],
                     "responses": {
                         "200": {
-                            "description": "OK"
+                            "description": "File download (no JSON response)"
                         }
                     }
                 }
@@ -123,15 +136,15 @@ async def swagger_json():
         }
     }
 
-# Log incoming headers for debugging
+# Debug middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     print(f">>> {request.method} {request.url}")
-    print(f">>> Headers: {dict(request.headers)}")
     response = await call_next(request)
     print(f">>> Response status: {response.status_code}")
     return response
 
+# GET Todo
 @app.get("/todos/{id}")
 async def get_todo(id: int):
     return {
@@ -141,6 +154,7 @@ async def get_todo(id: int):
         "completed": False
     }
 
+# Upload Excel
 @app.post("/excel/upload")
 async def upload_excel(file: UploadFile = File(...)):
     if not file.filename.endswith(('.xlsx', '.xls')):
@@ -151,15 +165,17 @@ async def upload_excel(file: UploadFile = File(...)):
                 "message": "Only .xlsx or .xls files are allowed"
             }
         )
+
     contents = await file.read()
     df = pd.read_excel(io.BytesIO(contents))
     excel_file = pd.ExcelFile(io.BytesIO(contents))
     sheet_name = excel_file.sheet_names[0]
-    data = df.to_dict(orient="records")
+
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     temp_file.write(contents)
     temp_file.close()
-    response = {
+
+    return {
         "status": "success",
         "message": "File uploaded successfully",
         "fileName": file.filename,
@@ -168,22 +184,25 @@ async def upload_excel(file: UploadFile = File(...)):
         "sheetName": sheet_name,
         "rowsProcessed": len(df),
         "errorDetails": "",
-        "data": data,
         "downloadUrl": f"/excel/download/{os.path.basename(temp_file.name)}"
     }
-    return response
 
+# Download Excel
 @app.get("/excel/download/{temp_filename}")
 async def download_excel(temp_filename: str):
     temp_path = os.path.join(tempfile.gettempdir(), temp_filename)
+
     if not os.path.exists(temp_path):
         return JSONResponse(
             status_code=404,
-            content={"status": "error", "message": "File not found"}
+            content={
+                "status": "error",
+                "message": "File not found"
+            }
         )
+
     return FileResponse(
         path=temp_path,
         filename=temp_filename,
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-
